@@ -1,5 +1,4 @@
-const CACHE="hz09-anatomy-v4";
-const ANATOMY_PREFIX="https://raw.githubusercontent.com/Nurkan1/Anatria-3D/949ac80cc9763539afc48e60b5246132f00468db/public/anatomy/";
+const CACHE="hz09-anatomy-v5";
 
 self.addEventListener("install",event=>{
   event.waitUntil(self.skipWaiting());
@@ -18,7 +17,7 @@ async function cacheFirst(request){
   const hit=await cache.match(request);
   if(hit)return hit;
   const response=await fetch(request);
-  if(response.ok||response.type==="opaque")cache.put(request,response.clone()).catch(()=>{});
+  if(response.ok)cache.put(request,response.clone()).catch(()=>{});
   return response;
 }
 
@@ -40,7 +39,7 @@ self.addEventListener("fetch",event=>{
   if(request.method!=="GET")return;
   const url=new URL(request.url);
 
-  if(request.url.startsWith(ANATOMY_PREFIX)){
+  if(url.origin===self.location.origin&&url.pathname.includes("/anatomy-v5/")){
     event.respondWith(cacheFirst(request));
     return;
   }

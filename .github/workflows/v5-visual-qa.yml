@@ -1,0 +1,155 @@
+name: V5 Visual QA
+on:
+  push:
+    branches: [v5-mesh-repair]
+    paths:
+      - "public/anatomy-v5/**"
+      - "src/**"
+      - "package.json"
+      - "index.html"
+      - ".github/workflows/v5-visual-qa.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  visual-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npm install --no-save playwright@1.55.0 pngjs@7.0.0
+      - run: npx playwright install --with-deps chromium
+      - name: Unit tests and production build
+        run: |
+          npm test
+          npm run build
+      - name: Start preview server
+        run: |
+          nohup npm run preview -- --port 4173 --base=/HZ09/ > /tmp/vite-preview.log 2>&1 &
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:4173/HZ09/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/vite-preview.log
+          exit 1
+      - name: Capture anatomical QA views
+        run: |
+          mkdir -p visual-qa
+          node --input-type=module <<'JS'
+          import { chromium } from "playwright";
+          import fs from "node:fs";
+          import { PNG } from "pngjs";
+
+          const browser = await chromium.launch({headless:true});
+          const page = await browser.newPage({viewport:{width:1600,height:1000},deviceScaleFactor:1});
+          const errors=[];
+          page.on("console",msg=>{ if(msg.type()==="error") errors.push("console: "+msg.text()); });
+          page.on("pageerror",err=>errors.push("pageerror: "+err.message));
+          page.on("requestfailed",req=>errors.push("requestfailed: "+req.url()+" :: "+(req.failure()?.errorText||"unknown")));
+
+          await page.addInitScript(()=>{
+            localStorage.setItem("hz09-anatomy-view-v5",JSON.stringify({
+              renderQuality:"performance",
+              connectiveMode:"natural",
+              smartMuscle:true
+            }));
+          });
+
+          await page.goto("http://127.0.0.1:4173/HZ09/",{waitUntil:"domcontentloaded",timeout:120000});
+          try{
+            await page.waitForFunction(()=>{
+              const el=document.querySelector(".status");
+              return el && /structures indexed/i.test(el.textContent||"");
+            },null,{timeout:120000});
+          }catch(error){
+            await page.screenshot({path:"visual-qa/00-load-timeout.png",fullPage:false});
+            const status=await page.locator(".status").innerText().catch(()=>null);
+            const fatal=await page.locator(".fatal").innerText().catch(()=>null);
+            fs.writeFileSync("visual-qa/load-diagnostics.json",JSON.stringify({status,fatal,errors,error:String(error)},null,2));
+            throw new Error("Atlas did not reach ready state. status="+status+" fatal="+fatal+" errors="+errors.join(" | "));
+          }
+
+          async function snap(name){
+            await page.waitForTimeout(1400);
+            await page.screenshot({path:"visual-qa/"+name+".png",fullPage:false});
+          }
+
+          function tealRatio(file){
+            const png=PNG.sync.read(fs.readFileSync(file));
+            let teal=0,total=png.width*png.height;
+            for(let i=0;i<png.data.length;i+=4){
+              const r=png.data[i],g=png.data[i+1],b=png.data[i+2],a=png.data[i+3];
+              if(a>220 && r<145 && g>145 && b>150 && (g-r)>35) teal++;
+            }
+            return teal/total;
+          }
+
+          await page.getByRole("button",{name:"Combined"}).click();
+          await snap("01-combined-anterior");
+
+          await page.getByRole("button",{name:"Muscle study"}).click();
+          await snap("02-muscle-anterior");
+
+          await page.getByRole("button",{name:"Attachments",exact:true}).click();
+          await snap("03-attachments-anterior");
+
+          const search=page.locator(".search input");
+          await search.fill("pectoralis major");
+          await page.locator(".results button").first().click();
+          await page.waitForTimeout(1200);
+          const context=page.locator(".selectionActions button",{hasText:"Context"});
+          if(await context.count()) await context.click();
+          await snap("04-pectoralis-context");
+
+          await page.keyboard.press("Escape");
+          await search.fill("pectineus muscle (left)");
+          await page.locator(".results button").first().click();
+          await page.waitForTimeout(1200);
+          await snap("05-pectineus-selected");
+
+          {
+            const ratio=tealRatio("visual-qa/05-pectineus-selected.png");
+            fs.writeFileSync("visual-qa/pectineus-teal-ratio.txt",String(ratio));
+            if(ratio>0.12) throw new Error("Pectineus selection anomaly: excessive cyan/teal coverage ratio="+ratio.toFixed(4));
+          }
+
+          await page.keyboard.press("Escape");
+          await search.fill("iliotibial tract (right)");
+          await page.locator(".results button").first().click();
+          await page.waitForTimeout(1200);
+          await snap("06-iliotibial-selected");
+          {
+            const ratio=tealRatio("visual-qa/06-iliotibial-selected.png");
+            fs.writeFileSync("visual-qa/iliotibial-teal-ratio.txt",String(ratio));
+            if(ratio>0.10) throw new Error("Iliotibial selection anomaly: excessive cyan/teal coverage ratio="+ratio.toFixed(4));
+          }
+
+          await page.keyboard.press("Escape");
+          await search.fill("fascia lata");
+          await page.locator(".results button").first().click();
+          await page.waitForTimeout(1200);
+          await snap("07-fascia-lata");
+
+          const info={
+            url:page.url(),
+            title:await page.title(),
+            status:await page.locator(".status").innerText().catch(()=>null),
+            errors
+          };
+          fs.writeFileSync("visual-qa/browser-report.json",JSON.stringify(info,null,2));
+          if(errors.length) {
+            console.error(errors.join("\n"));
+            process.exitCode=1;
+          }
+          await browser.close();
+          JS
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: v5-visual-qa
+          path: visual-qa/
+          retention-days: 14
