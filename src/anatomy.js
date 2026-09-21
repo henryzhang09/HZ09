@@ -116,17 +116,20 @@ export function pickFromStack(ids,organMap,options={}){
   const candidates=(ids||[]).map(id=>organMap?.get?.(id)).filter(Boolean);
   if(!candidates.length)return null;
 
-  const pickable=candidates.filter(o=>effectiveOpacity(o,opacities[o.system]??1,connectiveMode)>=.5);
-  const first=pickable[0]??candidates[0];
+  // Deliberate layer ghosting should click through. Intrinsic fascia
+  // translucency should not make fascia impossible to inspect when Smart Pick
+  // is switched off.
+  const layerPickable=candidates.filter(o=>(opacities[o.system]??1)>=.5);
+  const first=layerPickable[0]??candidates[0];
 
-  if(smartMuscle&&first.system==="muscular"&&isConnective(first)){
-    const underlyingMuscle=candidates.find(o=>o.system==="muscular"&&!isConnective(o));
-    if(underlyingMuscle)return underlyingMuscle.organ_id;
+  if(connectiveMode==="hide"&&isConnective(first)){
+    const next=candidates.find(o=>!isConnective(o)&&(opacities[o.system]??1)>=.5);
+    if(next)return next.organ_id;
   }
 
-  if(effectiveOpacity(first,opacities[first.system]??1,connectiveMode)<.5){
-    const nextSolid=candidates.find(o=>effectiveOpacity(o,opacities[o.system]??1,connectiveMode)>=.5);
-    if(nextSolid)return nextSolid.organ_id;
+  if(smartMuscle&&first.system==="muscular"&&isConnective(first)){
+    const underlyingMuscle=candidates.find(o=>o.system==="muscular"&&!isConnective(o)&&(opacities[o.system]??1)>=.5);
+    if(underlyingMuscle)return underlyingMuscle.organ_id;
   }
 
   return first.organ_id;
