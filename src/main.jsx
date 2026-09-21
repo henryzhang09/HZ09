@@ -56,6 +56,12 @@ const BLACK=new THREE.Color("#000000");
 const NO_RAYCAST=()=>null;
 const DEFAULT_RAYCAST=THREE.Mesh.prototype.raycast;
 
+function isRenderableOrgan(organ){
+  const source=String(organ?.source_name||organ?.node||"").trim().toLowerCase();
+  if(source.endsWith(".g"))return false;
+  return SYSTEMS.some(s=>s.id===(organ?.layer||organ?.system));
+}
+
 SYSTEMS.forEach(s=>useGLTF.preload(BASE+s.file,true));
 
 function tissueColour(organ){
@@ -109,7 +115,10 @@ const OrganMesh=memo(function OrganMesh({
   const base=useMemo(()=>tissueColour(organ),[organ]);
   const shown=useMemo(()=>selected&&!isolated?base.clone().lerp(CYAN,.18):base,[base,selected,isolated]);
   const naturalOpacity=effectiveOpacity(organ,layerOpacity,connectiveMode);
-  const opacity=isolated?1:selected?Math.max(naturalOpacity,.68):naturalOpacity;
+  // Selection must never change geometry visibility. In particular, broad
+  // fascia/connective sheets can become visually catastrophic if selecting
+  // them suddenly makes them opaque. Highlight with colour/emissive only.
+  const opacity=isolated?1:naturalOpacity;
   const ghosted=opacity<.995;
   const depthBias=tissueDepthBias(organ);
   const family=tissueFamily(organ);
@@ -179,6 +188,7 @@ const SystemModel=memo(function SystemModel({
     scene.updateMatrixWorld(true);
     const out=[];
     for(const organ of organs){
+      if(!isRenderableOrgan(organ))continue;
       const node=nodes[organ.node]??nodes[THREE.PropertyBinding.sanitizeNodeName(organ.node)];
       if(!(node instanceof THREE.Mesh))continue;
       node.updateWorldMatrix(true,false);
@@ -333,8 +343,8 @@ const Viewer=memo(function Viewer({
   const byFile=useMemo(()=>{
     const m=new Map();
     for(const o of manifest.organs){
+      if(!isRenderableOrgan(o))continue;
       const layer=o.layer||o.system;
-      if(!SYSTEMS.some(s=>s.id===layer))continue;
       if(!m.has(o.mesh_file))m.set(o.mesh_file,[]);
       m.get(o.mesh_file).push(o);
     }
@@ -442,7 +452,7 @@ function App(){
       .catch(e=>setError(e.message||"Manifest load failed"));
   },[]);
 
-  const organs=useMemo(()=>manifest?manifest.organs.filter(o=>SYSTEMS.some(s=>s.id===(o.layer||o.system))):[],[manifest]);
+  const organs=useMemo(()=>manifest?manifest.organs.filter(isRenderableOrgan):[],[manifest]);
   const organMap=useMemo(()=>new Map(organs.map(o=>[o.organ_id,o])),[organs]);
   const selected=selectedId?organMap.get(selectedId):null;
   const hovered=hover?.id?organMap.get(hover.id):null;
