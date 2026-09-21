@@ -3,6 +3,7 @@ import{tissueFamily}from"./anatomy.js";
 const BASE={
   bone:{hex:"#e2d8c3",roughness:.72,metalness:.01,clearcoat:.03,clearcoatRoughness:.8,sheen:.04,sheenHex:"#fff4dc",sheenRoughness:.9},
   muscle:{hex:"#963d43",roughness:.48,metalness:.015,clearcoat:.08,clearcoatRoughness:.5,sheen:.28,sheenHex:"#8e2930",sheenRoughness:.75},
+  attachment:{hex:"#d7a24a",roughness:.42,metalness:.0,clearcoat:.14,clearcoatRoughness:.42,sheen:.18,sheenHex:"#ffe0a0",sheenRoughness:.68},
   fascia:{hex:"#d9d2c3",roughness:.66,metalness:.0,clearcoat:.06,clearcoatRoughness:.65,sheen:.16,sheenHex:"#f0e7d7",sheenRoughness:.82},
   tendon:{hex:"#e4d7bd",roughness:.50,metalness:.0,clearcoat:.10,clearcoatRoughness:.55,sheen:.12,sheenHex:"#fff6df",sheenRoughness:.76},
   aponeurosis:{hex:"#dfd4c2",roughness:.58,metalness:.0,clearcoat:.08,clearcoatRoughness:.6,sheen:.14,sheenHex:"#f7eedc",sheenRoughness:.8},
@@ -30,7 +31,7 @@ export function tissueVisual(organ){
 
 export function colourVariation(organ){
   const family=tissueFamily(organ);
-  if(!["muscle","bone"].includes(family))return{h:0,s:0,l:0};
+  if(!["muscle","bone","attachment"].includes(family))return{h:0,s:0,l:0};
   const seed=hash(organ?.organ_id||family);
   return{
     h:spread(seed,0)*.014,
