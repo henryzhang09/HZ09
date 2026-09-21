@@ -78,6 +78,16 @@ jobs:
             await page.screenshot({path:"visual-qa/"+name+".png",fullPage:false});
           }
 
+          function tealRatio(file){
+            const png=PNG.sync.read(fs.readFileSync(file));
+            let teal=0,total=png.width*png.height;
+            for(let i=0;i<png.data.length;i+=4){
+              const r=png.data[i],g=png.data[i+1],b=png.data[i+2],a=png.data[i+3];
+              if(a>220 && r<145 && g>145 && b>150 && (g-r)>35) teal++;
+            }
+            return teal/total;
+          }
+
           await page.getByRole("button",{name:"Combined"}).click();
           await snap("01-combined-anterior");
 
@@ -102,22 +112,27 @@ jobs:
           await snap("05-pectineus-selected");
 
           {
-            const png=PNG.sync.read(fs.readFileSync("visual-qa/05-pectineus-selected.png"));
-            let teal=0,total=png.width*png.height;
-            for(let i=0;i<png.data.length;i+=4){
-              const r=png.data[i],g=png.data[i+1],b=png.data[i+2],a=png.data[i+3];
-              if(a>220 && r<145 && g>145 && b>150 && (g-r)>35) teal++;
-            }
-            const ratio=teal/total;
+            const ratio=tealRatio("visual-qa/05-pectineus-selected.png");
             fs.writeFileSync("visual-qa/pectineus-teal-ratio.txt",String(ratio));
-            if(ratio>0.12) throw new Error("Selection rendering anomaly: excessive cyan/teal coverage ratio="+ratio.toFixed(4));
+            if(ratio>0.12) throw new Error("Pectineus selection anomaly: excessive cyan/teal coverage ratio="+ratio.toFixed(4));
+          }
+
+          await page.keyboard.press("Escape");
+          await search.fill("iliotibial tract (right)");
+          await page.locator(".results button").first().click();
+          await page.waitForTimeout(1200);
+          await snap("06-iliotibial-selected");
+          {
+            const ratio=tealRatio("visual-qa/06-iliotibial-selected.png");
+            fs.writeFileSync("visual-qa/iliotibial-teal-ratio.txt",String(ratio));
+            if(ratio>0.10) throw new Error("Iliotibial selection anomaly: excessive cyan/teal coverage ratio="+ratio.toFixed(4));
           }
 
           await page.keyboard.press("Escape");
           await search.fill("fascia lata");
           await page.locator(".results button").first().click();
           await page.waitForTimeout(1200);
-          await snap("06-fascia-lata");
+          await snap("07-fascia-lata");
 
           const info={
             url:page.url(),
