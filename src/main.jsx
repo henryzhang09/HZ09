@@ -197,10 +197,11 @@ const SystemModel=memo(function SystemModel({
     {entries.map(entry=>{
       const o=entry.organ;
       const cvKind=cardioKind(o);
-      const cardioVisible=o.system!=="cardiovascular"||cardioParts[cvKind]!==false;
-      const connectiveAllowed=connectiveMode!=="hide"||!isConnective(o)||o.organ_id===selectedId||o.organ_id===isolateId;
+      const explicitlyStudied=o.organ_id===selectedId||o.organ_id===isolateId;
+      const cardioVisible=o.system!=="cardiovascular"||cardioParts[cvKind]!==false||explicitlyStudied;
+      const connectiveAllowed=connectiveMode!=="hide"||!isConnective(o)||explicitlyStudied;
       const contextVisible=!isolateId||o.organ_id===isolateId||(contextMode&&o.system==="skeletal");
-      const systemEnabled=enabled||(contextMode&&Boolean(isolateId)&&o.system==="skeletal");
+      const systemEnabled=enabled||explicitlyStudied||(contextMode&&Boolean(isolateId)&&o.system==="skeletal");
       const visible=systemEnabled&&cardioVisible&&connectiveAllowed&&!hidden.has(o.organ_id)&&contextVisible;
       const contextOpacity=contextMode&&isolateId&&o.system==="skeletal"&&o.organ_id!==isolateId?.18:opacity;
       return <OrganMesh
@@ -457,6 +458,7 @@ function App(){
 
   const results=useMemo(()=>rankedSearch(organs,query,80),[query,organs]);
   const chooseFromStack=useCallback(ids=>pickFromStack(ids,organMap,{smartMuscle,opacities,connectiveMode}),[organMap,smartMuscle,opacities,connectiveMode]);
+  const chooseSurfaceFromStack=useCallback(ids=>pickFromStack(ids,organMap,{smartMuscle:false,opacities,connectiveMode}),[organMap,opacities,connectiveMode]);
 
   const pick=useCallback(ids=>{
     const id=chooseFromStack(ids);
@@ -472,13 +474,13 @@ function App(){
   },[chooseFromStack]);
 
   const hideStack=useCallback(ids=>{
-    const id=chooseFromStack(ids);
+    const id=chooseSurfaceFromStack(ids);
     if(!id)return;
     setHiddenIds(prev=>prev.includes(id)?prev:[...prev,id]);
     setStackIds(ids);
     if(selectedId===id)setSelectedId(null);
     if(isolateId===id){setIsolateId(null);setContextMode(false)}
-  },[chooseFromStack,selectedId,isolateId]);
+  },[chooseSurfaceFromStack,selectedId,isolateId]);
 
   const hoverStack=useCallback((ids,x,y)=>{
     const id=chooseFromStack(ids);
@@ -488,17 +490,20 @@ function App(){
 
   const clearSelection=useCallback(()=>{setSelectedId(null);setStackIds([])},[]);
   const select=(id,focus=false)=>{
+    setHiddenIds(prev=>prev.includes(id)?prev.filter(x=>x!==id):prev);
     setSelectedId(id);setStackIds([id]);
     if(focus)setFocusRequest({id,seq:Date.now()});
     setRightOpen(true);
   };
   const isolate=id=>{
     if(!id)return;
+    setHiddenIds(prev=>prev.includes(id)?prev.filter(x=>x!==id):prev);
     setSelectedId(id);setIsolateId(id);setContextMode(false);
     setFocusRequest({id,seq:Date.now()});
   };
   const contextStudy=id=>{
     if(!id)return;
+    setHiddenIds(prev=>prev.includes(id)?prev.filter(x=>x!==id):prev);
     setSelectedId(id);setIsolateId(id);setContextMode(true);
     setFocusRequest({id,seq:Date.now()});
   };
