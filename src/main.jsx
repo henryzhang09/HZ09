@@ -182,7 +182,8 @@ const SystemModel=memo(function SystemModel({
       const cardioVisible=o.system!=="cardiovascular"||cardioParts[cvKind]!==false;
       const connectiveAllowed=connectiveMode!=="hide"||!isConnective(o)||o.organ_id===selectedId||o.organ_id===isolateId;
       const contextVisible=!isolateId||o.organ_id===isolateId||(contextMode&&o.system==="skeletal");
-      const visible=enabled&&cardioVisible&&connectiveAllowed&&!hidden.has(o.organ_id)&&contextVisible;
+      const systemEnabled=enabled||(contextMode&&Boolean(isolateId)&&o.system==="skeletal");
+      const visible=systemEnabled&&cardioVisible&&connectiveAllowed&&!hidden.has(o.organ_id)&&contextVisible;
       const contextOpacity=contextMode&&isolateId&&o.system==="skeletal"&&o.organ_id!==isolateId?.18:opacity;
       return <OrganMesh
         key={o.organ_id}
