@@ -36,7 +36,7 @@ function preferredQuality(){
   const saved=loadPreferences().renderQuality;
   if(["performance","balanced","quality"].includes(saved))return saved;
   const memory=Number(navigator.deviceMemory||0);
-  const coarse=matchMedia?.("(pointer: coarse)")?.matches;
+  const coarse=window.matchMedia?.("(pointer: coarse)")?.matches;
   const narrow=window.innerWidth<900;
   if((memory&&memory<=4)||coarse||narrow)return"balanced";
   return"quality";
