@@ -1,13 +1,29 @@
 export const VEIN=/\b(vena|venae|venous|vein|veins|sinus)\b/i;
 export const ARTERY=/\b(arteria|arteriae|arterial|artery|arteries|aorta|truncus)\b/i;
-export const CONNECTIVE=/\b(tendo|tendon|tendons|tendinis|aponeurosis|fascia|fascial|retinaculum|retinacula|ligamentum|ligament|ligaments|raphe|septum intermusculare)\b/i;
+export const TENDON=/\b(tendo|tendon|tendons|tendinis)\b/i;
+export const APONEUROSIS=/\b(aponeurosis|aponeurotic)\b/i;
+export const FASCIA=/\b(fascia|fascial|septum intermusculare|intermuscular septum|raphe)\b/i;
+export const RETINACULUM=/\b(retinaculum|retinacula)\b/i;
+export const LIGAMENT=/\b(ligamentum|ligament|ligaments|ligamenta)\b/i;
+export const CONNECTIVE=/\b(tendo|tendon|tendons|tendinis|aponeurosis|aponeurotic|fascia|fascial|retinaculum|retinacula|ligamentum|ligament|ligaments|ligamenta|raphe|septum intermusculare|intermuscular septum)\b/i;
 
 export function searchableName(organ){
   return [organ?.name_en,organ?.ta2_latin,organ?.qualifier,...(organ?.path||[])].filter(Boolean).join(" ");
 }
 
+export function connectiveSubtype(organ){
+  if(organ?.system!=="muscular")return null;
+  const n=searchableName(organ);
+  if(TENDON.test(n))return"tendon";
+  if(APONEUROSIS.test(n))return"aponeurosis";
+  if(RETINACULUM.test(n))return"retinaculum";
+  if(LIGAMENT.test(n))return"ligament";
+  if(FASCIA.test(n))return"fascia";
+  return null;
+}
+
 export function isConnective(organ){
-  return organ?.system==="muscular"&&CONNECTIVE.test(searchableName(organ));
+  return connectiveSubtype(organ)!==null;
 }
 
 export function cardioKind(organ){
@@ -19,18 +35,62 @@ export function cardioKind(organ){
   return"other";
 }
 
-export function structureKind(organ){
-  if(!organ)return"Structure";
-  if(organ.system==="muscular")return isConnective(organ)?"Fascia / tendon":"Skeletal muscle";
-  if(organ.system==="skeletal")return"Bone";
+export function tissueFamily(organ){
+  if(!organ)return"other";
+  const connective=connectiveSubtype(organ);
+  if(connective)return connective;
   if(organ.system==="cardiovascular"){
-    const kind=cardioKind(organ);
-    if(kind==="artery")return"Artery";
-    if(kind==="vein")return"Vein";
-    if(kind==="heart")return"Heart";
-    return"Cardiovascular";
+    const c=cardioKind(organ);
+    if(c)return c;
   }
-  return organ.system||"Structure";
+  if(organ.system==="skeletal")return"bone";
+  if(organ.system==="muscular")return"muscle";
+  return organ.system||"other";
+}
+
+export function structureKind(organ){
+  const family=tissueFamily(organ);
+  const labels={
+    tendon:"Tendon",
+    aponeurosis:"Aponeurosis",
+    fascia:"Fascia",
+    retinaculum:"Retinaculum",
+    ligament:"Ligament",
+    muscle:"Skeletal muscle",
+    bone:"Bone",
+    artery:"Artery",
+    vein:"Vein",
+    heart:"Heart",
+    other:"Structure",
+    cardiovascular:"Cardiovascular"
+  };
+  return labels[family]||family;
+}
+
+export function tissueBaseOpacity(organ){
+  switch(tissueFamily(organ)){
+    // Broad fascial sheets sit directly on muscle. Treating them as solid makes
+    // the muscle layer look missing; translucency preserves both tissues.
+    case"fascia":return .42;
+    case"aponeurosis":return .68;
+    case"retinaculum":return .82;
+    case"tendon":return .92;
+    case"ligament":return .92;
+    default:return 1;
+  }
+}
+
+export function tissueDepthBias(organ){
+  const family=tissueFamily(organ);
+  return["fascia","aponeurosis","retinaculum","tendon","ligament"].includes(family)?-1:0;
+}
+
+export function effectiveOpacity(organ,layerOpacity=1,connectiveMode="natural"){
+  let tissue=tissueBaseOpacity(organ);
+  const connective=isConnective(organ);
+  if(connectiveMode==="hide"&&connective)return 0;
+  if(connectiveMode==="ghost"&&connective)tissue*=.5;
+  return Math.min(1,Math.max(0,layerOpacity*tissue));
 }
 
 export function displayName(organ){
@@ -52,17 +112,27 @@ export function stackFromIntersections(intersections,max=12){
 }
 
 export function pickFromStack(ids,organMap,options={}){
-  const {smartMuscle=true,opacities={}}=options;
+  const {smartMuscle=true,opacities={},connectiveMode="natural"}=options;
   const candidates=(ids||[]).map(id=>organMap?.get?.(id)).filter(Boolean);
   if(!candidates.length)return null;
 
-  const solid=candidates.find(o=>(opacities[o.system]??1)>=0.5)??candidates[0];
+  // Deliberate layer ghosting should click through. Intrinsic fascia
+  // translucency should not make fascia impossible to inspect when Smart Pick
+  // is switched off.
+  const layerPickable=candidates.filter(o=>(opacities[o.system]??1)>=.5);
+  const first=layerPickable[0]??candidates[0];
 
-  if(smartMuscle&&solid.system==="muscular"&&isConnective(solid)){
-    const underlyingMuscle=candidates.find(o=>o.system==="muscular"&&!isConnective(o));
+  if(connectiveMode==="hide"&&isConnective(first)){
+    const next=candidates.find(o=>!isConnective(o)&&(opacities[o.system]??1)>=.5);
+    if(next)return next.organ_id;
+  }
+
+  if(smartMuscle&&first.system==="muscular"&&isConnective(first)){
+    const underlyingMuscle=candidates.find(o=>o.system==="muscular"&&!isConnective(o)&&(opacities[o.system]??1)>=.5);
     if(underlyingMuscle)return underlyingMuscle.organ_id;
   }
-  return solid.organ_id;
+
+  return first.organ_id;
 }
 
 export function rankedSearch(organs,query,limit=80){
@@ -94,7 +164,7 @@ export function viewDirection(view,leftSign=1){
   if(view==="posterior")return[0,0,-1];
   if(view==="left")return[leftSign,0,0];
   if(view==="right")return[-leftSign,0,0];
-  if(view==="superior")return[0,1,0.001];
+  if(view==="superior")return[0,1,.001];
   return[0,0,1];
 }
 

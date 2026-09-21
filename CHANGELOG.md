@@ -1,5 +1,36 @@
 # Changelog
 
+## 4.0.0 — 2026-09-21
+
+### Rendering
+- Replaced uniform StandardMaterial rendering with tissue-aware PhysicalMaterial profiles.
+- Added distinct visual properties for skeletal muscle, fascia, tendon, aponeurosis, retinaculum, ligament, bone, artery, vein, and myocardium.
+- Added PMREM studio environment lighting.
+- Added optional N8AO screen-space ambient occlusion.
+- Added stable muscle/bone colour variation to separate adjacent anatomical structures.
+- Added connective-tissue depth bias to reduce z-fighting where fascial sheets sit directly on muscle.
+- Broad fascia now renders semitransparently rather than as an opaque cream shell.
+- Added selected-structure outlines without sacrificing the underlying surface shading.
+
+### Study workflow
+- Added Natural / Ghost / Hide connective-tissue modes.
+- Added Attachments and Dissection presets.
+- Added Context Study to retain a translucent skeleton around an isolated muscle or connective structure.
+- Preserved Smart Muscle Pick, depth-stack inspection, peel/hide, isolation, search, and standard anatomical viewpoints.
+
+### Performance and reliability
+- Added Performance / Balanced / Quality renderer profiles.
+- Added device-aware initial renderer quality.
+- Persisted renderer/connective preferences locally.
+- Added a service worker cache for pinned anatomy assets.
+- Added asset-host preconnect hints.
+- Expanded automated tests to connective subtype classification, transparency/depth-bias rules, picking behavior, search ranking, and renderer profiles.
+- v4 development is validated on a release branch before merging to production.
+
+### Data integrity
+- No missing anatomy is generated or inferred.
+- The viewer explicitly distinguishes improvements in rendering from limitations in source-geometry coverage.
+
 ## 3.0.0 — 2026-09-21
 
 ### Interaction
