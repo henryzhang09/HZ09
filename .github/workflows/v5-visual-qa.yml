@@ -20,7 +20,7 @@ jobs:
         with:
           node-version: 22
       - run: npm install
-      - run: npm install --no-save playwright@1.55.0
+      - run: npm install --no-save playwright@1.55.0 pngjs@7.0.0
       - run: npx playwright install --with-deps chromium
       - name: Unit tests and production build
         run: |
@@ -41,6 +41,7 @@ jobs:
           node --input-type=module <<'JS'
           import { chromium } from "playwright";
           import fs from "node:fs";
+          import { PNG } from "pngjs";
 
           const browser = await chromium.launch({headless:true});
           const page = await browser.newPage({viewport:{width:1600,height:1000},deviceScaleFactor:1});
@@ -77,10 +78,28 @@ jobs:
           await snap("04-pectoralis-context");
 
           await page.keyboard.press("Escape");
+          await search.fill("pectineus muscle (left)");
+          await page.locator(".results button").first().click();
+          await page.waitForTimeout(1200);
+          await snap("05-pectineus-selected");
+
+          {
+            const png=PNG.sync.read(fs.readFileSync("visual-qa/05-pectineus-selected.png"));
+            let teal=0,total=png.width*png.height;
+            for(let i=0;i<png.data.length;i+=4){
+              const r=png.data[i],g=png.data[i+1],b=png.data[i+2],a=png.data[i+3];
+              if(a>220 && r<145 && g>145 && b>150 && (g-r)>35) teal++;
+            }
+            const ratio=teal/total;
+            fs.writeFileSync("visual-qa/pectineus-teal-ratio.txt",String(ratio));
+            if(ratio>0.12) throw new Error("Selection rendering anomaly: excessive cyan/teal coverage ratio="+ratio.toFixed(4));
+          }
+
+          await page.keyboard.press("Escape");
           await search.fill("fascia lata");
           await page.locator(".results button").first().click();
           await page.waitForTimeout(1200);
-          await snap("05-fascia-lata");
+          await snap("06-fascia-lata");
 
           const info={
             url:page.url(),
