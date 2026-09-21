@@ -202,7 +202,7 @@ function unionBoxes(boxes,ids){
 }
 
 function CameraDirector({controlsRef,boxesRef,focusRequest,viewRequest,isolateId,allIds}){
-  const{camera}=useThree();
+  const{camera,invalidate}=useThree();
   const desired=useRef(null);
 
   const frame=useCallback((box,direction=null)=>{
@@ -213,7 +213,8 @@ function CameraDirector({controlsRef,boxesRef,focusRequest,viewRequest,isolateId
     const distance=Math.max((radius*2.35)/Math.tan((camera.fov*Math.PI)/360),.12);
     const dir=direction?new THREE.Vector3(...direction).normalize():camera.position.clone().sub(c.target).normalize();
     desired.current={target:centre,position:centre.clone().add(dir.multiplyScalar(distance))};
-  },[camera,controlsRef]);
+    invalidate();
+  },[camera,controlsRef,invalidate]);
 
   useEffect(()=>{
     if(!focusRequest?.id)return;
@@ -240,7 +241,7 @@ function CameraDirector({controlsRef,boxesRef,focusRequest,viewRequest,isolateId
     c.update();
     if(c.target.distanceToSquared(d.target)<1e-8&&camera.position.distanceToSquared(d.position)<1e-8){
       c.target.copy(d.target);camera.position.copy(d.position);c.update();desired.current=null;
-    }
+    }else invalidate();
   });
   return null;
 }
@@ -424,6 +425,7 @@ function App(){
   const restoreHidden=()=>setHiddenIds([]);
   const requestView=(kind,view)=>setViewRequest({kind,view,seq:Date.now()});
   const handleLoaded=useCallback((file,count)=>setLoaded(prev=>prev[file]===count?prev:{...prev,[file]:count}),[]);
+  const handleCanvasReady=useCallback(canvas=>{canvasRef.current=canvas},[]);
   const loadedCount=Object.keys(loaded).length;
 
   const applyPreset=name=>{
@@ -549,7 +551,7 @@ function App(){
           focusRequest={focusRequest}
           viewRequest={viewRequest}
           onLoaded={handleLoaded}
-          onCanvasReady={canvas=>{canvasRef.current=canvas}}
+          onCanvasReady={handleCanvasReady}
         /></AtlasErrorBoundary>:<div className={"loading "+(error?"error":"")}>{error||"Loading TA2 anatomy manifest…"}</div>}
       </div>
 
