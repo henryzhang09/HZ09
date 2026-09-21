@@ -22,7 +22,25 @@ import{
 import{colourVariation,qualityProfile,tissueVisual}from"./rendering.js";
 import"./styles.css";
 
-const APP_VERSION="4.0.0-rc.1";
+const APP_VERSION="4.0.0-rc.2";
+const PREF_KEY="hz09-anatomy-view-v4";
+
+function loadPreferences(){
+  try{
+    const saved=JSON.parse(localStorage.getItem(PREF_KEY)||"{}");
+    return saved&&typeof saved==="object"?saved:{};
+  }catch{return{}}
+}
+
+function preferredQuality(){
+  const saved=loadPreferences().renderQuality;
+  if(["performance","balanced","quality"].includes(saved))return saved;
+  const memory=Number(navigator.deviceMemory||0);
+  const coarse=matchMedia?.("(pointer: coarse)")?.matches;
+  const narrow=window.innerWidth<900;
+  if((memory&&memory<=4)||coarse||narrow)return"balanced";
+  return"quality";
+}
 const SOURCE_COMMIT="949ac80cc9763539afc48e60b5246132f00468db";
 const BASE="https://raw.githubusercontent.com/Nurkan1/Anatria-3D/"+SOURCE_COMMIT+"/public/anatomy/";
 const MANIFEST_URL=BASE+"manifest.json";
@@ -396,9 +414,10 @@ function App(){
   const[layers,setLayers]=useState({skeletal:true,muscular:true,cardiovascular:true});
   const[opacities,setOpacities]=useState({skeletal:.92,muscular:1,cardiovascular:1});
   const[cardioParts,setCardioParts]=useState({artery:true,vein:true,heart:true,other:true});
-  const[connectiveMode,setConnectiveMode]=useState("natural");
-  const[smartMuscle,setSmartMuscle]=useState(true);
-  const[renderQuality,setRenderQuality]=useState("quality");
+  const prefRef=useRef(loadPreferences());
+  const[connectiveMode,setConnectiveMode]=useState(()=>["natural","ghost","hide"].includes(prefRef.current.connectiveMode)?prefRef.current.connectiveMode:"natural");
+  const[smartMuscle,setSmartMuscle]=useState(()=>prefRef.current.smartMuscle!==false);
+  const[renderQuality,setRenderQuality]=useState(preferredQuality);
   const[hiddenIds,setHiddenIds]=useState([]);
   const[stackIds,setStackIds]=useState([]);
   const[hover,setHover]=useState(null);
@@ -407,6 +426,12 @@ function App(){
   const[rightOpen,setRightOpen]=useState(false);
   const canvasRef=useRef(null);
   const{progress,active}=useProgress();
+
+  useEffect(()=>{
+    try{
+      localStorage.setItem(PREF_KEY,JSON.stringify({renderQuality,connectiveMode,smartMuscle}));
+    }catch{}
+  },[renderQuality,connectiveMode,smartMuscle]);
 
   useEffect(()=>{
     fetch(MANIFEST_URL)
@@ -604,7 +629,7 @@ function App(){
         <div className="segmented">
           {[["performance","Fast"],["balanced","Balanced"],["quality","Quality"]].map(([id,label])=><button className={renderQuality===id?"on":""} key={id} onClick={()=>setRenderQuality(id)}>{label}</button>)}
         </div>
-        <p>Quality 开启环境光照与屏幕空间 AO，增强肌腹、肌腱、骨性标志之间的深度分离。</p>
+        <p>Quality 开启高 DPR、环境光照与屏幕空间 AO；较低性能设备首访自动使用 Balanced，并记住你的选择。</p>
       </div>
 
       <div className="interactionCard">
