@@ -84,7 +84,7 @@ jobs:
           await page.getByRole("button",{name:"Muscle study"}).click();
           await snap("02-muscle-anterior");
 
-          await page.getByRole("button",{name:"Attachments"}).click();
+          await page.getByRole("button",{name:"Attachments",exact:true}).click();
           await snap("03-attachments-anterior");
 
           const search=page.locator(".search input");
