@@ -40,7 +40,7 @@ header button:hover,.drawerClose:hover{border-color:#4bd3d855;color:#e0f7f9}
 .drawerClose{display:none;width:30px;padding:4px 0;font-size:15px}
 h2{font-size:17px;font-weight:520;margin:5px 0 14px}
 .sectionTitle{margin-top:21px}
-.presets{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:9px}
+.presets{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:9px}.presets.six button{min-height:34px}
 .presets button,.subfilters button,.actions button,.hiddenActions button{
   border:1px solid var(--line);background:#ffffff05;color:#98b0b4;border-radius:7px;padding:8px;cursor:pointer
 }
@@ -74,7 +74,16 @@ h2{font-size:17px;font-weight:520;margin:5px 0 14px}
 }
 .muscleTools input{accent-color:#45d8df}
 .muscleTools em{font-size:7px;font-style:normal;color:#55767c}
-.interactionCard,.dataCard,.scope,.hiddenPanel{
+.toolLine{display:flex;align-items:center;justify-content:space-between;font-size:8px;color:#8fa9ad}
+.toolLine>span{font-weight:600;letter-spacing:.03em}
+.toolLine>em{font-style:normal;color:#5d7a80}
+.segmented{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+.segmented button{border:1px solid var(--line);background:#ffffff04;color:#718f94;border-radius:6px;padding:6px 4px;font-size:7px;cursor:pointer}
+.segmented button:hover,.segmented button.on{border-color:#4bd3d84d;background:#4bd3d811;color:#d9f7f8}
+.renderCard{margin-top:14px;padding:11px;border:1px solid var(--line);border-radius:9px;background:#ffffff035}
+.renderCard .segmented{margin-top:8px}
+.renderCard p{margin:8px 0 0;color:#617e83;font-size:8px;line-height:1.55}
+.interactionCard,.dataCard,.scope,.hiddenPanel,.renderCard{
   margin-top:17px;padding:12px;border:1px solid var(--line);border-radius:9px;background:#ffffff04
 }
 .interactionCard p{font-size:8px;color:#78949a;line-height:1.55;margin:7px 0 0}
@@ -169,7 +178,7 @@ main:fullscreen{background:#071116}
 .latin{font-family:Georgia,serif;font-style:italic;color:#92aeb2;font-size:11px;margin:0 0 8px}
 .right code{font-size:8px;color:#58767c;word-break:break-all}
 .actions{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:13px}
-.actions.four{grid-template-columns:repeat(4,1fr)}
+.actions.four{grid-template-columns:repeat(4,1fr)}.actions.five{grid-template-columns:repeat(5,1fr)}
 .actions button{font-size:8px}.actions button.on{background:#4bd3d817;border-color:#4bd3d855;color:#d9fbfc}
 .meta{display:grid;grid-template-columns:1fr 1fr;margin-top:14px;border-left:1px solid var(--line);border-top:1px solid var(--line)}
 .meta p{margin:0;padding:9px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);min-width:0}
