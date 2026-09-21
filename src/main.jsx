@@ -1,7 +1,7 @@
 import React,{Suspense,memo,useCallback,useEffect,useMemo,useRef,useState}from"react";
 import{createRoot}from"react-dom/client";
 import{Canvas,useFrame,useThree}from"@react-three/fiber";
-import{ContactShadows,OrbitControls,Outlines,useGLTF,useProgress}from"@react-three/drei";
+import{ContactShadows,OrbitControls,useGLTF,useProgress}from"@react-three/drei";
 import{EffectComposer,N8AO}from"@react-three/postprocessing";
 import{RoomEnvironment}from"three/addons/environments/RoomEnvironment.js";
 import*as THREE from"three";
@@ -22,7 +22,7 @@ import{
 import{colourVariation,qualityProfile,tissueVisual}from"./rendering.js";
 import"./styles.css";
 
-const APP_VERSION="5.0.0-rc.1";
+const APP_VERSION="5.0.0-rc.2";
 const PREF_KEY="hz09-anatomy-view-v5";
 
 function loadPreferences(){
@@ -107,7 +107,7 @@ const OrganMesh=memo(function OrganMesh({
   const materialRef=useRef(null);
   const profile=useMemo(()=>tissueVisual(organ),[organ]);
   const base=useMemo(()=>tissueColour(organ),[organ]);
-  const shown=useMemo(()=>selected&&!isolated?base.clone().lerp(CYAN,.34):base,[base,selected,isolated]);
+  const shown=useMemo(()=>selected&&!isolated?base.clone().lerp(CYAN,.18):base,[base,selected,isolated]);
   const naturalOpacity=effectiveOpacity(organ,layerOpacity,connectiveMode);
   const opacity=isolated?1:selected?Math.max(naturalOpacity,.68):naturalOpacity;
   const ghosted=opacity<.995;
@@ -147,10 +147,10 @@ const OrganMesh=memo(function OrganMesh({
       ref={materialRef}
       color={shown}
       emissive={selected?CYAN:BLACK}
-      emissiveIntensity={selected?(isolated?.035:.085):0}
+      emissiveIntensity={selected?(isolated?.025:.055):0}
       roughness={profile.roughness}
       metalness={profile.metalness}
-      clearcoat={profile.clearcoat}
+      clearcoat={selected?Math.min(1,profile.clearcoat+.08):profile.clearcoat}
       clearcoatRoughness={profile.clearcoatRoughness}
       sheen={profile.sheen}
       sheenColor={profile.sheenHex}
@@ -164,7 +164,6 @@ const OrganMesh=memo(function OrganMesh({
       polygonOffsetUnits={depthBias}
       side={THREE.FrontSide}
     />
-    {selected&&<Outlines thickness={1.25} screenspace color="#69e8ef" transparent opacity={.48}/>}
   </mesh>;
 });
 
