@@ -1,0 +1,16 @@
+{
+  "thorax_shoulder_axilla": [
+    "pector", "deltoid", "axill", "serratus", "serrat", "latissim", "clavicul",
+    "scapul", "subscap", "supraspin", "infraspin", "teres", "trapez",
+    "fascia pector", "fascia axill", "fascia clavi"
+  ],
+  "pelvis_gluteal": [
+    "glute", "piriform", "obturator", "gemell", "quadratus femor", "fascia lata",
+    "tensor fascia", "iliotib", "pelvis", "ilium", "ischi", "pub", "sacrum"
+  ],
+  "proximal_thigh": [
+    "femor", "quadriceps", "rectus femor", "vastus", "adductor", "gracil",
+    "sartori", "iliopso", "pectine", "hamstring", "biceps femor", "semitend",
+    "semimembr", "inguin", "tractus iliotib"
+  ]
+}
