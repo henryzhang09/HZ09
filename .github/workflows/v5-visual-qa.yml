@@ -54,7 +54,7 @@ jobs:
           await page.waitForFunction(()=>{
             const el=document.querySelector(".status");
             return el && /structures indexed/i.test(el.textContent||"");
-          },{timeout:180000});
+          },null,{timeout:180000});
 
           async function snap(name){
             await page.waitForTimeout(1400);
