@@ -3,6 +3,7 @@ export const ARTERY=/\b(arteria|arteriae|arterial|artery|arteries|aorta|truncus)
 export const TENDON=/\b(tendo|tendon|tendons|tendinis)\b/i;
 export const APONEUROSIS=/\b(aponeurosis|aponeurotic)\b/i;
 export const FASCIA=/\b(fascia|fascial|septum intermusculare|intermuscular septum|raphe)\b/i;
+export const ILIOTIBIAL=/\b(iliotibial tract|tractus iliotibialis)\b/i;
 export const RETINACULUM=/\b(retinaculum|retinacula)\b/i;
 export const LIGAMENT=/\b(ligamentum|ligament|ligaments|ligamenta)\b/i;
 export const CONNECTIVE=/\b(tendo|tendon|tendons|tendinis|aponeurosis|aponeurotic|fascia|fascial|retinaculum|retinacula|ligamentum|ligament|ligaments|ligamenta|raphe|septum intermusculare|intermuscular septum)\b/i;
@@ -19,6 +20,7 @@ export function connectiveSubtype(organ){
   if(APONEUROSIS.test(n))return"aponeurosis";
   if(RETINACULUM.test(n))return"retinaculum";
   if(LIGAMENT.test(n))return"ligament";
+  if(ILIOTIBIAL.test(n))return"fascia";
   if(FASCIA.test(n))return"fascia";
   return null;
 }
