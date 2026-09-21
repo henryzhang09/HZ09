@@ -7,6 +7,7 @@ import{
 
 const muscle={organ_id:"m1",name_en:"Gluteus medius",ta2_latin:"Musculus gluteus medius",system:"muscular",path:["Muscles of hip"]};
 const fascia={organ_id:"f1",name_en:"Fascia lata",ta2_latin:"Fascia lata",system:"muscular",path:["Fascia"]};
+const iliotibial={organ_id:"it1",name_en:"Iliotibial tract (right)",ta2_latin:"Tractus iliotibialis",system:"muscular",path:["Muscles of lower limb"]};
 const tendon={organ_id:"t1",name_en:"Calcaneal tendon",ta2_latin:"Tendo calcaneus",system:"muscular",path:["Tendons"]};
 const aponeurosis={organ_id:"ap1",name_en:"Palmar aponeurosis",ta2_latin:"Aponeurosis palmaris",system:"muscular",path:["Aponeuroses"]};
 const ligament={organ_id:"l1",name_en:"Inguinal ligament",ta2_latin:"Ligamentum inguinale",system:"muscular",path:["Ligaments"]};
@@ -19,6 +20,8 @@ test("classifies connective subtypes without classifying muscle belly",()=>{
   assert.equal(connectiveSubtype(tendon),"tendon");
   assert.equal(connectiveSubtype(aponeurosis),"aponeurosis");
   assert.equal(connectiveSubtype(ligament),"ligament");
+  assert.equal(connectiveSubtype(iliotibial),"fascia");
+  assert.equal(isConnective(iliotibial),true);
   assert.equal(isConnective(muscle),false);
   assert.equal(structureKind(fascia),"Fascia");
   assert.equal(structureKind(tendon),"Tendon");
@@ -41,6 +44,7 @@ test("classifies arteries and veins",()=>{
 
 test("connective tissue keeps subtype-specific transparency and depth bias",()=>{
   assert.equal(tissueBaseOpacity(fascia),.42);
+  assert.equal(tissueBaseOpacity(iliotibial),.42);
   assert.equal(tissueBaseOpacity(tendon),.92);
   assert.equal(tissueBaseOpacity(aponeurosis),.68);
   assert.equal(tissueDepthBias(fascia),-1);
