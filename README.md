@@ -2,9 +2,9 @@
 
 Interactive 3D anatomy viewer focused on skeletal, muscular, connective-tissue, and cardiovascular anatomy.
 
-## Current release candidate
+## Current release
 
-**v4.0.0-rc.2**
+**v4.0.0**
 
 The viewer is designed around professional anatomical nomenclature and high-detail open geometry rather than AI-generated anatomy.
 
