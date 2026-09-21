@@ -1,4 +1,4 @@
-name: V5 Source Mesh Audit and Repair
+name: V5 Source Mesh Audit Repair and Export
 on:
   push:
     branches: [v5-mesh-repair]
@@ -7,37 +7,41 @@ on:
       - ".github/workflows/v5-mesh-repair.yml"
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
-  mesh-audit:
+  mesh-pipeline:
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 60
+    env:
+      Z_ANATOMY_SHA: 23d42ff2acf149e4cc0af666b3f80af2ed19909a
+      ANATRIA_SHA: 949ac80cc9763539afc48e60b5246132f00468db
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: v5-mesh-repair
 
       - name: Install Blender and utilities
         run: |
           sudo apt-get update
           sudo apt-get install -y blender unzip jq
 
-      - name: Download pinned Z-Anatomy source
+      - name: Download pinned anatomy sources
         run: |
-          mkdir -p source reports output
-          curl -L --fail --retry 3             https://raw.githubusercontent.com/Z-Anatomy/Models-of-human-anatomy/master/Z-Anatomy.zip             -o source/Z-Anatomy.zip
+          mkdir -p source reports output public/anatomy-v5
+          curl -L --fail --retry 3             "https://raw.githubusercontent.com/Z-Anatomy/Models-of-human-anatomy/$Z_ANATOMY_SHA/Z-Anatomy.zip"             -o source/Z-Anatomy.zip
+          curl -L --fail --retry 3             "https://raw.githubusercontent.com/Nurkan1/Anatria-3D/$ANATRIA_SHA/public/anatomy/manifest.json"             -o source/anatria-manifest.json
           sha256sum source/Z-Anatomy.zip | tee reports/source-sha256.txt
           unzip -q source/Z-Anatomy.zip -d source/unpacked
-          echo "Top-level source contents:"
-          find source/unpacked -maxdepth 2 -type f | head -80
           BLEND="$(find source/unpacked -type f -iname '*.blend' -print -quit)"
           test -n "$BLEND"
           echo "BLEND_FILE=$BLEND" >> "$GITHUB_ENV"
-          echo "Using Blender source: $BLEND"
+          echo "Using source: $BLEND"
 
       - name: Audit original source geometry
         run: |
           blender --background "$BLEND_FILE"             --python tools/blender_mesh_audit.py --             --regions tools/mesh_regions.json             --output reports/source-audit.json | tee reports/source-audit.log
 
-      - name: Run conservative repair on priority regions
+      - name: Run conservative topology repair
         run: |
           blender --background "$BLEND_FILE"             --python tools/blender_mesh_repair.py --             --regions tools/mesh_regions.json             --output output/Z-Anatomy-v5-conservative.blend             --report reports/repair-report.json | tee reports/repair.log
 
@@ -45,7 +49,12 @@ jobs:
         run: |
           blender --background output/Z-Anatomy-v5-conservative.blend             --python tools/blender_mesh_audit.py --             --regions tools/mesh_regions.json             --output reports/repaired-audit.json | tee reports/repaired-audit.log
 
-      - name: Compare audit metrics
+      - name: Export source-complete v5 WebGL assets
+        run: |
+          blender --background output/Z-Anatomy-v5-conservative.blend             --python tools/blender_export_v5.py --             --old-manifest source/anatria-manifest.json             --out-dir public/anatomy-v5             --manifest public/anatomy-v5/manifest-v5.json | tee reports/export.log
+          ls -lh public/anatomy-v5
+
+      - name: Compare QA metrics
         run: |
           python - <<'PY'
           import json
@@ -53,14 +62,17 @@ jobs:
           a=json.loads(Path("reports/source-audit.json").read_text())
           b=json.loads(Path("reports/repaired-audit.json").read_text())
           r=json.loads(Path("reports/repair-report.json").read_text())
+          m=json.loads(Path("public/anatomy-v5/manifest-v5.json").read_text())
           keys=["priority_boundary_edges","priority_non_manifold_edges","priority_degenerate_faces","priority_loose_vertices"]
-          lines=["# V5 mesh repair summary",""]
+          lines=["# V5 mesh pipeline summary",""]
+          lines.append(f"- Z-Anatomy commit: {m['source']['commit']}")
           lines.append(f"- Source mesh objects: {a['summary']['mesh_objects']}")
           lines.append(f"- Priority-region objects: {a['summary']['priority_objects']}")
-          lines.append(f"- Objects modified: {r['summary']['objects_modified']}")
+          lines.append(f"- Objects modified conservatively: {r['summary']['objects_modified']}")
           lines.append(f"- Near-duplicate vertices merged: {r['summary']['merged_vertices']}")
           lines.append(f"- Loose vertices deleted: {r['summary']['deleted_loose_vertices']}")
           lines.append(f"- Tiny holes filled: {r['summary']['filled_small_holes']}")
+          lines.append(f"- Exported manifest rows: {len(m['organs'])}")
           lines.append("")
           lines.append("| Metric | Before | After | Delta |")
           lines.append("|---|---:|---:|---:|")
@@ -68,20 +80,52 @@ jobs:
               before=a["summary"].get(k,0)
               after=b["summary"].get(k,0)
               lines.append(f"| {k} | {before} | {after} | {after-before:+d} |")
+          lines.append("")
+          lines.append("| Layer | Objects | Asset size (MB) |")
+          lines.append("|---|---:|---:|")
+          for key,row in m["stats"].items():
+              lines.append(f"| {key} | {row.get('objects',0)} | {row.get('bytes',0)/1048576:.2f} |")
           Path("reports/summary.md").write_text("\n".join(lines),encoding="utf-8")
           print("\n".join(lines))
           PY
 
-      - name: Package repaired source
+      - name: Enforce safe asset limits
+        run: |
+          python - <<'PY'
+          import json,sys
+          from pathlib import Path
+          m=json.loads(Path("public/anatomy-v5/manifest-v5.json").read_text())
+          oversized=[]
+          for k,v in m["stats"].items():
+              if v.get("bytes",0)>=95*1024*1024:
+                  oversized.append((k,v["bytes"]))
+          if oversized:
+              print("Assets too large for normal GitHub content:",oversized)
+              sys.exit(1)
+          PY
+
+      - name: Commit generated v5 web assets to release branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/anatomy-v5
+          if git diff --cached --quiet; then
+            echo "No generated asset changes."
+          else
+            git commit -m "Generate repaired v5 anatomy web assets"
+            git push origin HEAD:v5-mesh-repair
+          fi
+
+      - name: Package repaired source for QA
         run: |
           zip -9 -j output/Z-Anatomy-v5-conservative.zip output/Z-Anatomy-v5-conservative.blend
-          ls -lh source/Z-Anatomy.zip output/Z-Anatomy-v5-conservative.zip reports/*.json
 
       - uses: actions/upload-artifact@v4
         with:
-          name: z-anatomy-v5-mesh-repair
+          name: z-anatomy-v5-mesh-pipeline
           path: |
             reports/
+            public/anatomy-v5/
             output/Z-Anatomy-v5-conservative.zip
           compression-level: 0
           retention-days: 14
