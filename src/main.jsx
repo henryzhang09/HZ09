@@ -22,8 +22,8 @@ import{
 import{colourVariation,qualityProfile,tissueVisual}from"./rendering.js";
 import"./styles.css";
 
-const APP_VERSION="4.0.0";
-const PREF_KEY="hz09-anatomy-view-v4";
+const APP_VERSION="5.0.0-rc.1";
+const PREF_KEY="hz09-anatomy-view-v5";
 
 function loadPreferences(){
   try{
@@ -41,15 +41,16 @@ function preferredQuality(){
   if((memory&&memory<=4)||coarse||narrow)return"balanced";
   return"quality";
 }
-const SOURCE_COMMIT="949ac80cc9763539afc48e60b5246132f00468db";
-const BASE="https://raw.githubusercontent.com/Nurkan1/Anatria-3D/"+SOURCE_COMMIT+"/public/anatomy/";
-const MANIFEST_URL=BASE+"manifest.json";
+const SOURCE_COMMIT="23d42ff2acf149e4cc0af666b3f80af2ed19909a";
+const BASE=import.meta.env.BASE_URL+"anatomy-v5/";
+const MANIFEST_URL=BASE+"manifest-v5.json";
 const SYSTEMS=[
-  {id:"skeletal",zh:"骨骼",en:"Skeletal",file:"skeletal_male.glb"},
-  {id:"muscular",zh:"肌肉",en:"Muscular",file:"muscular_male.glb"},
-  {id:"cardiovascular",zh:"心血管",en:"Cardiovascular",file:"cardiovascular_male.glb"}
+  {id:"skeletal",zh:"骨骼",en:"Skeletal",file:"skeletal_v5.glb"},
+  {id:"muscular",zh:"肌肉",en:"Muscle & fascia",file:"muscular_v5.glb"},
+  {id:"attachments",zh:"附着区",en:"Muscle attachments",file:"attachments_v5.glb"},
+  {id:"cardiovascular",zh:"心血管",en:"Cardiovascular",file:"cardiovascular_v5.glb"}
 ];
-const SYSTEM_LABEL={skeletal:"Bone",muscular:"Muscle",cardiovascular:"Heart & vessels"};
+const SYSTEM_LABEL={skeletal:"Bone",muscular:"Muscle & fascia",attachments:"Attachment area",cardiovascular:"Heart & vessels"};
 const CYAN=new THREE.Color("#37d8e6");
 const BLACK=new THREE.Color("#000000");
 const NO_RAYCAST=()=>null;
@@ -128,7 +129,7 @@ const OrganMesh=memo(function OrganMesh({
     visible={visible}
     userData={userData}
     raycast={visible?DEFAULT_RAYCAST:NO_RAYCAST}
-    renderOrder={organ.system==="cardiovascular"?3:organ.system==="muscular"?2:1}
+    renderOrder={organ.layer==="attachments"?4:organ.system==="cardiovascular"?3:organ.system==="muscular"?2:1}
     onPointerMove={e=>{
       e.stopPropagation();
       const n=e.nativeEvent;
@@ -333,7 +334,8 @@ const Viewer=memo(function Viewer({
   const byFile=useMemo(()=>{
     const m=new Map();
     for(const o of manifest.organs){
-      if(!SYSTEMS.some(s=>s.id===o.system))continue;
+      const layer=o.layer||o.system;
+      if(!SYSTEMS.some(s=>s.id===layer))continue;
       if(!m.has(o.mesh_file))m.set(o.mesh_file,[]);
       m.get(o.mesh_file).push(o);
     }
@@ -412,8 +414,8 @@ function App(){
   const[query,setQuery]=useState("");
   const[focusRequest,setFocusRequest]=useState(null);
   const[viewRequest,setViewRequest]=useState(null);
-  const[layers,setLayers]=useState({skeletal:true,muscular:true,cardiovascular:true});
-  const[opacities,setOpacities]=useState({skeletal:.92,muscular:1,cardiovascular:1});
+  const[layers,setLayers]=useState({skeletal:true,muscular:true,attachments:false,cardiovascular:true});
+  const[opacities,setOpacities]=useState({skeletal:.92,muscular:1,attachments:.86,cardiovascular:1});
   const[cardioParts,setCardioParts]=useState({artery:true,vein:true,heart:true,other:true});
   const prefRef=useRef(loadPreferences());
   const[connectiveMode,setConnectiveMode]=useState(()=>["natural","ghost","hide"].includes(prefRef.current.connectiveMode)?prefRef.current.connectiveMode:"natural");
@@ -441,16 +443,17 @@ function App(){
       .catch(e=>setError(e.message||"Manifest load failed"));
   },[]);
 
-  const organs=useMemo(()=>manifest?manifest.organs.filter(o=>SYSTEMS.some(s=>s.id===o.system)):[],[manifest]);
+  const organs=useMemo(()=>manifest?manifest.organs.filter(o=>SYSTEMS.some(s=>s.id===(o.layer||o.system))):[],[manifest]);
   const organMap=useMemo(()=>new Map(organs.map(o=>[o.organ_id,o])),[organs]);
   const selected=selectedId?organMap.get(selectedId):null;
   const hovered=hover?.id?organMap.get(hover.id):null;
   const hiddenSet=useMemo(()=>new Set(hiddenIds),[hiddenIds]);
 
   const counts=useMemo(()=>{
-    const c={skeletal:0,muscular:0,cardiovascular:0,connective:0};
+    const c={skeletal:0,muscular:0,attachments:0,cardiovascular:0,connective:0};
     for(const o of organs){
-      if(c[o.system]!==undefined)c[o.system]++;
+      const key=o.layer||o.system;
+      if(c[key]!==undefined)c[key]++;
       if(isConnective(o))c.connective++;
     }
     return c;
@@ -523,33 +526,33 @@ function App(){
   const applyPreset=name=>{
     showAll();
     if(name==="combined"){
-      setLayers({skeletal:true,muscular:true,cardiovascular:true});
-      setOpacities({skeletal:.92,muscular:1,cardiovascular:1});
+      setLayers({skeletal:true,muscular:true,attachments:false,cardiovascular:true});
+      setOpacities({skeletal:.92,muscular:1,attachments:.86,cardiovascular:1});
       setConnectiveMode("natural");
     }
     if(name==="muscle"){
-      setLayers({skeletal:true,muscular:true,cardiovascular:false});
-      setOpacities({skeletal:.34,muscular:1,cardiovascular:1});
+      setLayers({skeletal:true,muscular:true,attachments:false,cardiovascular:false});
+      setOpacities({skeletal:.34,muscular:1,attachments:.86,cardiovascular:1});
       setConnectiveMode("natural");
     }
     if(name==="attachments"){
-      setLayers({skeletal:true,muscular:true,cardiovascular:false});
-      setOpacities({skeletal:.62,muscular:1,cardiovascular:1});
+      setLayers({skeletal:true,muscular:true,attachments:true,cardiovascular:false});
+      setOpacities({skeletal:.72,muscular:.48,attachments:1,cardiovascular:1});
       setConnectiveMode("natural");
     }
     if(name==="dissection"){
-      setLayers({skeletal:true,muscular:true,cardiovascular:false});
-      setOpacities({skeletal:.22,muscular:1,cardiovascular:1});
+      setLayers({skeletal:true,muscular:true,attachments:false,cardiovascular:false});
+      setOpacities({skeletal:.22,muscular:1,attachments:.86,cardiovascular:1});
       setConnectiveMode("hide");
     }
     if(name==="angio"){
-      setLayers({skeletal:true,muscular:true,cardiovascular:true});
-      setOpacities({skeletal:.14,muscular:.10,cardiovascular:1});
+      setLayers({skeletal:true,muscular:true,attachments:false,cardiovascular:true});
+      setOpacities({skeletal:.14,muscular:.10,attachments:.35,cardiovascular:1});
       setConnectiveMode("hide");
     }
     if(name==="bone"){
-      setLayers({skeletal:true,muscular:false,cardiovascular:false});
-      setOpacities({skeletal:1,muscular:1,cardiovascular:1});
+      setLayers({skeletal:true,muscular:false,attachments:false,cardiovascular:false});
+      setOpacities({skeletal:1,muscular:1,attachments:.86,cardiovascular:1});
     }
   };
 
@@ -593,7 +596,7 @@ function App(){
   return <div className={"app "+(leftOpen?"leftOpen ":"")+(rightOpen?"rightOpen ":"")}>
     <header>
       <div className="brand"><b>ANATOMY ATLAS 3D</b><span>Z‑ANATOMY · TA2 NOMENCLATURE · RESEARCH VIEWER</span></div>
-      <div className="status"><i className={loadedCount===3?"ok":""}/>{error?"Load error":loadedCount===3?organs.length.toLocaleString()+" structures indexed":"Loading atlas "+Math.round(progress||0)+"%"}</div>
+      <div className="status"><i className={loadedCount===4?"ok":""}/>{error?"Load error":loadedCount===4?organs.length.toLocaleString()+" structures indexed":"Loading atlas "+Math.round(progress||0)+"%"}</div>
       <div className="mobilePanelButtons"><button onClick={()=>{setLeftOpen(v=>!v);setRightOpen(false)}}>Layers</button><button onClick={()=>{setRightOpen(v=>!v);setLeftOpen(false)}}>Info</button></div>
       <button className="resetButton" onClick={()=>{setSelectedId(null);showAll();setHiddenIds([]);setStackIds([]);requestView("fit")}}>Reset</button>
     </header>
@@ -617,6 +620,7 @@ function App(){
           <span><b>{s.zh}</b><em>{s.en} · {counts[s.id]?.toLocaleString()||"—"}</em></span><i/>
         </button>
         <div className="opacityRow"><span>Opacity</span><input aria-label={s.en+" opacity"} type="range" min=".05" max="1" step=".01" value={opacities[s.id]} onChange={e=>setOpacities(v=>({...v,[s.id]:Number(e.target.value)}))}/><b>{Math.round(opacities[s.id]*100)}%</b></div>
+        {s.id==="attachments"&&<div className="layerNote">原始 Z‑Anatomy 的独立肌肉附着标记层，不再冒充肌腹显示。</div>}
         {s.id==="muscular"&&<div className="muscleTools">
           <div className="toolLine"><span>筋膜 / 肌腱</span><em>{counts.connective}</em></div>
           <div className="segmented">
@@ -644,11 +648,11 @@ function App(){
         <p>Smart pick 会穿过半透明筋膜，优先选择其下的真实肌腹。</p>
       </div>
 
-      <div className="dataCard"><b>数据与命名</b><p>男性 atlas 为 Z‑Anatomy / BodyParts3D 衍生网格；TA2 Latin + clinical English。筋膜薄片采用独立透明度和深度偏移，避免与肌腹共面时发生 z-fighting。</p><dl><div><dt>Male atlas</dt><dd>3,478 structures</dd></div><div><dt>Mesh reduction</dt><dd>No polygon reduction*</dd></div><div><dt>License</dt><dd>CC BY-SA 4.0</dd></div></dl><p className="tiny">* 上游 GLB 使用 Draco 量化压缩。</p></div>
+      <div className="dataCard"><b>v5 源模型</b><p>直接从 2026-09-20 的 Z‑Anatomy 原始 Blender 工程重导，先做保守拓扑修复，再把肌腹/筋膜与独立 Muscular insertions 分层。未知结构不会由 AI 补画。</p><dl><div><dt>Source meshes</dt><dd>4,569</dd></div><div><dt>Source commit</dt><dd>{SOURCE_COMMIT.slice(0,8)}</dd></div><div><dt>License</dt><dd>CC BY-SA</dd></div></dl><p className="tiny">专业名称优先复用既有 TA2/clinical English 映射；新增源对象标记为 source-name-only。</p></div>
     </aside>
 
     <main onPointerLeave={()=>setHover(null)}>
-      <div className="search"><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search pectoral fascia / pectoralis major / tendon / femur / aorta / TA2 Latin…"/>{query&&<div className="results">{results.map(o=><button key={o.organ_id} onClick={()=>{select(o.organ_id,true);setQuery("")}}><b>{displayName(o)}</b><span>{o.ta2_latin} · {structureKind(o)}</span></button>)}{!results.length&&<p>No matching structure</p>}</div>}</div>
+      <div className="search"><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search pectoralis / pectoral fascia / muscle attachment / femur / aorta / TA2 Latin…"/>{query&&<div className="results">{results.map(o=><button key={o.organ_id} onClick={()=>{select(o.organ_id,true);setQuery("")}}><b>{displayName(o)}</b><span>{o.ta2_latin} · {structureKind(o)}</span></button>)}{!results.length&&<p>No matching structure</p>}</div>}</div>
 
       <div className="viewer">
         {manifest&&!error?<AtlasErrorBoundary><Viewer
@@ -676,7 +680,7 @@ function App(){
 
       {selected&&<div className="selectionDock">
         <div className="selectionText">
-          <span>{structureKind(selected)} · {SYSTEM_LABEL[selected.system]}</span>
+          <span>{structureKind(selected)} · {SYSTEM_LABEL[selected.layer||selected.system]}</span>
           <b>{displayName(selected)}</b>
           <em>{selected.ta2_latin}</em>
         </div>
@@ -701,7 +705,7 @@ function App(){
         <button title="Fullscreen" onClick={fullscreen}>⛶</button>
       </div>
 
-      {manifest&&(active||loadedCount<3)&&!error&&<div className="loadingOverlay"><div className="spinner"/><b>Loading high-detail geometry</b><span>{Math.round(progress||0)}% · 骨骼 / 肌肉 / 心血管</span></div>}
+      {manifest&&(active||loadedCount<4)&&!error&&<div className="loadingOverlay"><div className="spinner"/><b>Loading repaired source geometry</b><span>{Math.round(progress||0)}% · 骨骼 / 肌肉筋膜 / 附着区 / 心血管</span></div>}
       <div className="hud">Click identify · Double-click isolate · Right-click peel · C context · A/P/L/R/S views · F focus · I isolate · H hide</div>
     </main>
 
@@ -721,9 +725,9 @@ function App(){
         </div>
         <div className="meta">
           <p><span>System</span><b>{selected.system}</b></p>
+          <p><span>Layer</span><b>{selected.layer||selected.system}</b></p>
           <p><span>Type</span><b>{structureKind(selected)}</b></p>
-          <p><span>Tissue</span><b>{tissueFamily(selected)}</b></p>
-          <p><span>Mesh</span><b>{selected.mesh_file}</b></p>
+          <p><span>Metadata</span><b>{selected.metadata_status||"mapped"}</b></p>
         </div>
         {selected.path?.length>0&&<div className="path"><span>Anatomical hierarchy</span>{selected.path.map((p,i)=><div key={i}>{p}</div>)}</div>}
       </section>:<div className="empty"><div className="targetIcon">＋</div><b>Select a structure</b><span>点击模型、双击隔离，或搜索具体骨骼、肌肉、筋膜、肌腱、动脉和静脉。</span></div>}
@@ -738,7 +742,7 @@ function App(){
       <div className="scope"><b>研究/教学可视化边界</b><p>网格与专业命名来自开放解剖数据。v4 改进渲染，不补画源数据不存在的结构；因此视觉完整度仍受 Z‑Anatomy / BodyParts3D 原始几何覆盖限制。</p></div>
     </aside>
 
-    <footer><span>BodyParts3D → Z‑Anatomy → Anatria3D GLB adaptations · male assets CC BY‑SA 4.0 · source pinned {SOURCE_COMMIT.slice(0,8)}</span><span>v{APP_VERSION}</span></footer>
+    <footer><span>Z‑Anatomy source → conservative mesh QA/repair → HZ09 v5 GLB export · source pinned {SOURCE_COMMIT.slice(0,8)}</span><span>v{APP_VERSION}</span></footer>
   </div>;
 }
 createRoot(document.getElementById("root")).render(<App/>);
