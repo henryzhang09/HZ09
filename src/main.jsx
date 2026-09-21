@@ -22,7 +22,7 @@ import{
 import{colourVariation,qualityProfile,tissueVisual}from"./rendering.js";
 import"./styles.css";
 
-const APP_VERSION="4.0.0-rc.2";
+const APP_VERSION="4.0.0";
 const PREF_KEY="hz09-anatomy-view-v4";
 
 function loadPreferences(){
