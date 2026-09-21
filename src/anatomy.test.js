@@ -12,6 +12,7 @@ const aponeurosis={organ_id:"ap1",name_en:"Palmar aponeurosis",ta2_latin:"Aponeu
 const ligament={organ_id:"l1",name_en:"Inguinal ligament",ta2_latin:"Ligamentum inguinale",system:"muscular",path:["Ligaments"]};
 const artery={organ_id:"a1",name_en:"Femoral artery",ta2_latin:"Arteria femoralis",system:"cardiovascular",path:["Systemic arteries"]};
 const vein={organ_id:"v1",name_en:"Femoral vein",ta2_latin:"Vena femoralis",system:"cardiovascular",path:["Systemic veins"]};
+const attachment={organ_id:"att1",name_en:"Sternocostal head of pectoralis major muscle",ta2_latin:"",system:"muscular",layer:"attachments",path:["Muscular insertions"]};
 
 test("classifies connective subtypes without classifying muscle belly",()=>{
   assert.equal(connectiveSubtype(fascia),"fascia");
@@ -22,6 +23,13 @@ test("classifies connective subtypes without classifying muscle belly",()=>{
   assert.equal(structureKind(fascia),"Fascia");
   assert.equal(structureKind(tendon),"Tendon");
   assert.equal(structureKind(muscle),"Skeletal muscle");
+});
+
+test("keeps attachment markings separate from muscle bellies",()=>{
+  assert.equal(isConnective(attachment),false);
+  assert.equal(tissueFamily(attachment),"attachment");
+  assert.equal(structureKind(attachment),"Muscle attachment area");
+  assert.equal(tissueBaseOpacity(attachment),.86);
 });
 
 test("classifies arteries and veins",()=>{
@@ -64,6 +72,12 @@ test("opaque tendon remains directly pickable when smart muscle has no belly beh
 test("ghosted muscle layer yields to solid vessel",()=>{
   const map=new Map([[muscle.organ_id,muscle],[artery.organ_id,artery]]);
   assert.equal(pickFromStack(["m1","a1"],map,{smartMuscle:true,opacities:{muscular:.12,cardiovascular:1}}),"a1");
+});
+
+test("attachment opacity uses its own layer control",()=>{
+  const map=new Map([[attachment.organ_id,attachment],[muscle.organ_id,muscle]]);
+  assert.equal(pickFromStack(["att1","m1"],map,{smartMuscle:true,opacities:{attachments:.9,muscular:1}}),"att1");
+  assert.equal(pickFromStack(["att1","m1"],map,{smartMuscle:true,opacities:{attachments:.3,muscular:1}}),"m1");
 });
 
 test("search prioritizes exact clinical English",()=>{
