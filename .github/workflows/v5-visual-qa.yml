@@ -49,12 +49,29 @@ jobs:
           const errors=[];
           page.on("console",msg=>{ if(msg.type()==="error") errors.push("console: "+msg.text()); });
           page.on("pageerror",err=>errors.push("pageerror: "+err.message));
+          page.on("requestfailed",req=>errors.push("requestfailed: "+req.url()+" :: "+(req.failure()?.errorText||"unknown")));
+
+          await page.addInitScript(()=>{
+            localStorage.setItem("hz09-anatomy-view-v5",JSON.stringify({
+              renderQuality:"performance",
+              connectiveMode:"natural",
+              smartMuscle:true
+            }));
+          });
 
           await page.goto("http://127.0.0.1:4173/HZ09/",{waitUntil:"domcontentloaded",timeout:120000});
-          await page.waitForFunction(()=>{
-            const el=document.querySelector(".status");
-            return el && /structures indexed/i.test(el.textContent||"");
-          },null,{timeout:180000});
+          try{
+            await page.waitForFunction(()=>{
+              const el=document.querySelector(".status");
+              return el && /structures indexed/i.test(el.textContent||"");
+            },null,{timeout:120000});
+          }catch(error){
+            await page.screenshot({path:"visual-qa/00-load-timeout.png",fullPage:false});
+            const status=await page.locator(".status").innerText().catch(()=>null);
+            const fatal=await page.locator(".fatal").innerText().catch(()=>null);
+            fs.writeFileSync("visual-qa/load-diagnostics.json",JSON.stringify({status,fatal,errors,error:String(error)},null,2));
+            throw new Error("Atlas did not reach ready state. status="+status+" fatal="+fatal+" errors="+errors.join(" | "));
+          }
 
           async function snap(name){
             await page.waitForTimeout(1400);
