@@ -9,19 +9,19 @@
   "stats": {
     "skeletal": {
       "objects": 1244,
-      "bytes": 1783068
+      "bytes": 1768384
     },
     "muscular": {
       "objects": 789,
-      "bytes": 4535672
+      "bytes": 4513652
     },
     "attachments": {
       "objects": 705,
-      "bytes": 8223956
+      "bytes": 8191980
     },
     "cardiovascular": {
       "objects": 60,
-      "bytes": 8686252
+      "bytes": 8654040
     }
   },
   "organs": [
