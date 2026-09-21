@@ -5,7 +5,7 @@
   "type":"module",
   "scripts":{
     "dev":"vite --host 0.0.0.0",
-    "test":"node --test src/anatomy.test.js",
+    "test":"node --test src/*.test.js",
     "build":"vite build --base=/HZ09/",
     "check":"npm run test && npm run build",
     "preview":"vite preview --host 0.0.0.0"
