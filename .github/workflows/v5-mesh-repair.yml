@@ -23,7 +23,8 @@ jobs:
       - name: Install Blender and utilities
         run: |
           sudo apt-get update
-          sudo apt-get install -y blender unzip jq
+          sudo apt-get install -y blender unzip jq python3-numpy
+          npm install --global @gltf-transform/cli@4
 
       - name: Download pinned anatomy sources
         run: |
