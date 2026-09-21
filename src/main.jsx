@@ -59,7 +59,7 @@ function tissueColour(o){
 }
 function displayName(o){return o.qualifier?o.name_en+" · "+o.qualifier:o.name_en}
 
-const OrganMesh=memo(function OrganMesh({entry,organ,visible,opacity,selected,onSelect,registerBox}){
+const OrganMesh=memo(function OrganMesh({entry,organ,visible,opacity,selected,onSelect,onIsolate,registerBox}){
   const[hovered,setHovered]=useState(false);
   const base=useMemo(()=>tissueColour(organ),[organ]);
   const shown=useMemo(()=>{
@@ -79,6 +79,7 @@ const OrganMesh=memo(function OrganMesh({entry,organ,visible,opacity,selected,on
     onPointerOver={e=>{e.stopPropagation();setHovered(true);document.body.style.cursor="crosshair"}}
     onPointerOut={()=>{setHovered(false);document.body.style.cursor="default"}}
     onClick={e=>{e.stopPropagation();onSelect(organ.organ_id)}}
+    onDoubleClick={e=>{e.stopPropagation();onIsolate(organ.organ_id)}}
   >
     <meshStandardMaterial
       color={shown}
@@ -94,7 +95,7 @@ const OrganMesh=memo(function OrganMesh({entry,organ,visible,opacity,selected,on
   </mesh>
 });
 
-function SystemModel({file,organs,enabled,opacity,selectedId,isolateId,cardioParts,onSelect,registerBox,onReady}){
+function SystemModel({file,organs,enabled,opacity,selectedId,isolateId,cardioParts,onSelect,onIsolate,registerBox,onReady}){
   const url=BASE+file;
   const{nodes,scene}=useGLTF(url,true);
   const entries=useMemo(()=>{
@@ -119,7 +120,7 @@ function SystemModel({file,organs,enabled,opacity,selectedId,isolateId,cardioPar
       const cardioVisible=o.system!=="cardiovascular"||cardioParts[cardioKind(o)]!==false;
       const visible=enabled&&cardioVisible&&(!isolateId||o.organ_id===isolateId);
       const op=(selectedId===o.organ_id)?1:opacity;
-      return <OrganMesh key={o.organ_id} entry={entry} organ={o} visible={visible} opacity={op} selected={selectedId===o.organ_id} onSelect={onSelect} registerBox={registerBox}/>;
+      return <OrganMesh key={o.organ_id} entry={entry} organ={o} visible={visible} opacity={op} selected={selectedId===o.organ_id} onSelect={onSelect} onIsolate={onIsolate} registerBox={registerBox}/>;
     })}
   </group>
 }
@@ -179,7 +180,7 @@ function CameraDirector({controlsRef,boxesRef,focusRequest,resetKey}){
   return null;
 }
 
-function Viewer({manifest,layers,opacities,selectedId,isolateId,cardioParts,onSelect,focusRequest,resetKey,onLoaded}){
+function Viewer({manifest,layers,opacities,selectedId,isolateId,cardioParts,onSelect,onIsolate,focusRequest,resetKey,onLoaded}){
   const controlsRef=useRef();
   const boxesRef=useRef(new Map());
   const byFile=useMemo(()=>{
@@ -215,6 +216,7 @@ function Viewer({manifest,layers,opacities,selectedId,isolateId,cardioParts,onSe
         isolateId={isolateId}
         cardioParts={cardioParts}
         onSelect={onSelect}
+        onIsolate={onIsolate}
         registerBox={registerBox}
         onReady={onLoaded}
       />)}
@@ -266,9 +268,15 @@ function App(){
     }).slice(0,80);
   },[query,organs]);
   const select=(id,focus=false)=>{
-    setSelectedId(id);setIsolateId(null);
+    setSelectedId(id);
     if(focus)setFocusRequest({id,seq:Date.now()});
   };
+  const isolate=(id)=>{
+    setSelectedId(id);
+    setIsolateId(id);
+    setFocusRequest({id,seq:Date.now()});
+  };
+  const showAll=()=>setIsolateId(null);
   const applyPreset=(name)=>{
     if(name==="combined"){setLayers({skeletal:true,muscular:true,cardiovascular:true});setOpacities({skeletal:.90,muscular:.72,cardiovascular:1})}
     if(name==="muscle"){setLayers({skeletal:true,muscular:true,cardiovascular:false});setOpacities({skeletal:.92,muscular:1,cardiovascular:1})}
@@ -308,10 +316,22 @@ function App(){
     <main>
       <div className="search"><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search deltoid / femur / aorta / vena cava / TA2 Latin…"/>{query&&<div className="results">{results.map(o=><button key={o.organ_id} onClick={()=>{select(o.organ_id,true);setQuery("")}}><b>{displayName(o)}</b><span>{o.ta2_latin} · {SYSTEM_LABEL[o.system]}</span></button>)}{!results.length&&<p>No matching structure</p>}</div>}</div>
       <div className="viewer">
-        {manifest&&!error?<Viewer manifest={manifest} layers={layers} opacities={opacities} selectedId={selectedId} isolateId={isolateId} cardioParts={cardioParts} onSelect={select} focusRequest={focusRequest} resetKey={resetKey} onLoaded={handleLoaded}/>:<div className={"loading "+(error?"error":"")}>{error||"Loading TA2 anatomy manifest…"}</div>}
+        {manifest&&!error?<Viewer manifest={manifest} layers={layers} opacities={opacities} selectedId={selectedId} isolateId={isolateId} cardioParts={cardioParts} onSelect={select} onIsolate={isolate} focusRequest={focusRequest} resetKey={resetKey} onLoaded={handleLoaded}/>:<div className={"loading "+(error?"error":"")}>{error||"Loading TA2 anatomy manifest…"}</div>}
       </div>
+      {selected&&<div className="selectionDock">
+        <div className="selectionText">
+          <span>{SYSTEM_LABEL[selected.system]}</span>
+          <b>{displayName(selected)}</b>
+          <em>{selected.ta2_latin}</em>
+        </div>
+        <div className="selectionActions">
+          <button onClick={()=>setFocusRequest({id:selected.organ_id,seq:Date.now()})}>Focus</button>
+          <button className={isolateId===selected.organ_id?"on":""} onClick={()=>isolateId===selected.organ_id?showAll():isolate(selected.organ_id)}>{isolateId===selected.organ_id?"Show all":"Isolate"}</button>
+          <button className="close" onClick={()=>{setSelectedId(null);showAll()}}>×</button>
+        </div>
+      </div>}
       {manifest&&loadedCount<3&&!error&&<div className="loadingOverlay"><div className="spinner"/><b>Loading high-detail geometry</b><span>骨骼 / 肌肉 / 心血管 · 首次加载约 22 MB</span></div>}
-      <div className="hud">Left drag rotate · Wheel zoom · Right drag pan · Click structure</div>
+      <div className="hud">Click = identify · Double-click = isolate · Wheel zoom · Right drag pan</div>
     </main>
 
     <aside className="right">
@@ -323,8 +343,8 @@ function App(){
         <code>{selected.organ_id}</code>
         <div className="actions">
           <button onClick={()=>setFocusRequest({id:selected.organ_id,seq:Date.now()})}>Focus</button>
-          <button className={isolateId===selected.organ_id?"on":""} onClick={()=>setIsolateId(v=>v===selected.organ_id?null:selected.organ_id)}>Isolate</button>
-          <button onClick={()=>setIsolateId(null)}>Show all</button>
+          <button className={isolateId===selected.organ_id?"on":""} onClick={()=>isolateId===selected.organ_id?showAll():isolate(selected.organ_id)}>{isolateId===selected.organ_id?"Isolated":"Isolate"}</button>
+          <button onClick={showAll}>Show all</button>
         </div>
         <div className="meta">
           <p><span>System</span><b>{selected.system}</b></p>
