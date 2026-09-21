@@ -53,7 +53,7 @@ test("deduplicates ray intersections in depth order",()=>{
 test("smart muscle pick passes through superficial fascia",()=>{
   const map=new Map([[fascia.organ_id,fascia],[muscle.organ_id,muscle]]);
   assert.equal(pickFromStack(["f1","m1"],map,{smartMuscle:true,opacities:{muscular:1},connectiveMode:"natural"}),"m1");
-  assert.equal(pickFromStack(["f1","m1"],map,{smartMuscle:false,opacities:{muscular:1},connectiveMode:"natural"}),"m1");
+  assert.equal(pickFromStack(["f1","m1"],map,{smartMuscle:false,opacities:{muscular:1},connectiveMode:"natural"}),"f1");
 });
 
 test("opaque tendon remains directly pickable when smart muscle has no belly behind it",()=>{
