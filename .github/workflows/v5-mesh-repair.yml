@@ -1,0 +1,87 @@
+name: V5 Source Mesh Audit and Repair
+on:
+  push:
+    branches: [v5-mesh-repair]
+    paths:
+      - "tools/**"
+      - ".github/workflows/v5-mesh-repair.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  mesh-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Blender and utilities
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y blender unzip jq
+
+      - name: Download pinned Z-Anatomy source
+        run: |
+          mkdir -p source reports output
+          curl -L --fail --retry 3             https://raw.githubusercontent.com/Z-Anatomy/Models-of-human-anatomy/master/Z-Anatomy.zip             -o source/Z-Anatomy.zip
+          sha256sum source/Z-Anatomy.zip | tee reports/source-sha256.txt
+          unzip -q source/Z-Anatomy.zip -d source/unpacked
+          echo "Top-level source contents:"
+          find source/unpacked -maxdepth 2 -type f | head -80
+          BLEND="$(find source/unpacked -type f -iname '*.blend' -print -quit)"
+          test -n "$BLEND"
+          echo "BLEND_FILE=$BLEND" >> "$GITHUB_ENV"
+          echo "Using Blender source: $BLEND"
+
+      - name: Audit original source geometry
+        run: |
+          blender --background "$BLEND_FILE"             --python tools/blender_mesh_audit.py --             --regions tools/mesh_regions.json             --output reports/source-audit.json | tee reports/source-audit.log
+
+      - name: Run conservative repair on priority regions
+        run: |
+          blender --background "$BLEND_FILE"             --python tools/blender_mesh_repair.py --             --regions tools/mesh_regions.json             --output output/Z-Anatomy-v5-conservative.blend             --report reports/repair-report.json | tee reports/repair.log
+
+      - name: Audit repaired geometry
+        run: |
+          blender --background output/Z-Anatomy-v5-conservative.blend             --python tools/blender_mesh_audit.py --             --regions tools/mesh_regions.json             --output reports/repaired-audit.json | tee reports/repaired-audit.log
+
+      - name: Compare audit metrics
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          a=json.loads(Path("reports/source-audit.json").read_text())
+          b=json.loads(Path("reports/repaired-audit.json").read_text())
+          r=json.loads(Path("reports/repair-report.json").read_text())
+          keys=["priority_boundary_edges","priority_non_manifold_edges","priority_degenerate_faces","priority_loose_vertices"]
+          lines=["# V5 mesh repair summary",""]
+          lines.append(f"- Source mesh objects: {a['summary']['mesh_objects']}")
+          lines.append(f"- Priority-region objects: {a['summary']['priority_objects']}")
+          lines.append(f"- Objects modified: {r['summary']['objects_modified']}")
+          lines.append(f"- Near-duplicate vertices merged: {r['summary']['merged_vertices']}")
+          lines.append(f"- Loose vertices deleted: {r['summary']['deleted_loose_vertices']}")
+          lines.append(f"- Tiny holes filled: {r['summary']['filled_small_holes']}")
+          lines.append("")
+          lines.append("| Metric | Before | After | Delta |")
+          lines.append("|---|---:|---:|---:|")
+          for k in keys:
+              before=a["summary"].get(k,0)
+              after=b["summary"].get(k,0)
+              lines.append(f"| {k} | {before} | {after} | {after-before:+d} |")
+          Path("reports/summary.md").write_text("\n".join(lines),encoding="utf-8")
+          print("\n".join(lines))
+          PY
+
+      - name: Package repaired source
+        run: |
+          zip -9 -j output/Z-Anatomy-v5-conservative.zip output/Z-Anatomy-v5-conservative.blend
+          ls -lh source/Z-Anatomy.zip output/Z-Anatomy-v5-conservative.zip reports/*.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: z-anatomy-v5-mesh-repair
+          path: |
+            reports/
+            output/Z-Anatomy-v5-conservative.zip
+          compression-level: 0
+          retention-days: 14
