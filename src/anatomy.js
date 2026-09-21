@@ -12,6 +12,7 @@ export function searchableName(organ){
 }
 
 export function connectiveSubtype(organ){
+  if(organ?.layer==="attachments")return null;
   if(organ?.system!=="muscular")return null;
   const n=searchableName(organ);
   if(TENDON.test(n))return"tendon";
@@ -37,6 +38,7 @@ export function cardioKind(organ){
 
 export function tissueFamily(organ){
   if(!organ)return"other";
+  if(organ.layer==="attachments"||(organ.path||[]).includes("Muscular insertions"))return"attachment";
   const connective=connectiveSubtype(organ);
   if(connective)return connective;
   if(organ.system==="cardiovascular"){
@@ -57,6 +59,7 @@ export function structureKind(organ){
     retinaculum:"Retinaculum",
     ligament:"Ligament",
     muscle:"Skeletal muscle",
+    attachment:"Muscle attachment area",
     bone:"Bone",
     artery:"Artery",
     vein:"Vein",
@@ -76,6 +79,7 @@ export function tissueBaseOpacity(organ){
     case"retinaculum":return .82;
     case"tendon":return .92;
     case"ligament":return .92;
+    case"attachment":return .86;
     default:return 1;
   }
 }
@@ -111,6 +115,10 @@ export function stackFromIntersections(intersections,max=12){
   return ids;
 }
 
+export function opacityFor(organ,opacities={}){
+  return opacities[organ?.layer]??opacities[organ?.system]??1;
+}
+
 export function pickFromStack(ids,organMap,options={}){
   const {smartMuscle=true,opacities={},connectiveMode="natural"}=options;
   const candidates=(ids||[]).map(id=>organMap?.get?.(id)).filter(Boolean);
@@ -119,16 +127,16 @@ export function pickFromStack(ids,organMap,options={}){
   // Deliberate layer ghosting should click through. Intrinsic fascia
   // translucency should not make fascia impossible to inspect when Smart Pick
   // is switched off.
-  const layerPickable=candidates.filter(o=>(opacities[o.system]??1)>=.5);
+  const layerPickable=candidates.filter(o=>opacityFor(o,opacities)>=.5);
   const first=layerPickable[0]??candidates[0];
 
   if(connectiveMode==="hide"&&isConnective(first)){
-    const next=candidates.find(o=>!isConnective(o)&&(opacities[o.system]??1)>=.5);
+    const next=candidates.find(o=>!isConnective(o)&&opacityFor(o,opacities)>=.5);
     if(next)return next.organ_id;
   }
 
-  if(smartMuscle&&first.system==="muscular"&&isConnective(first)){
-    const underlyingMuscle=candidates.find(o=>o.system==="muscular"&&!isConnective(o)&&(opacities[o.system]??1)>=.5);
+  if(smartMuscle&&first.system==="muscular"&&first.layer!=="attachments"&&isConnective(first)){
+    const underlyingMuscle=candidates.find(o=>o.system==="muscular"&&o.layer!=="attachments"&&!isConnective(o)&&opacityFor(o,opacities)>=.5);
     if(underlyingMuscle)return underlyingMuscle.organ_id;
   }
 
