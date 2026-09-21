@@ -8,6 +8,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: write
+concurrency:
+  group: v5-mesh-pipeline
+  cancel-in-progress: true
 jobs:
   mesh-pipeline:
     runs-on: ubuntu-24.04
@@ -40,19 +43,49 @@ jobs:
 
       - name: Audit original source geometry
         run: |
+          set -o pipefail
           blender --background "$BLEND_FILE"             --python tools/blender_mesh_audit.py --             --regions tools/mesh_regions.json             --output reports/source-audit.json | tee reports/source-audit.log
 
       - name: Run conservative topology repair
         run: |
+          set -o pipefail
           blender --background "$BLEND_FILE"             --python tools/blender_mesh_repair.py --             --regions tools/mesh_regions.json             --output output/Z-Anatomy-v5-conservative.blend             --report reports/repair-report.json | tee reports/repair.log
 
       - name: Audit repaired geometry
         run: |
+          set -o pipefail
           blender --background output/Z-Anatomy-v5-conservative.blend             --python tools/blender_mesh_audit.py --             --regions tools/mesh_regions.json             --output reports/repaired-audit.json | tee reports/repaired-audit.log
 
       - name: Export source-complete v5 WebGL assets
         run: |
+          set -o pipefail
           blender --background output/Z-Anatomy-v5-conservative.blend             --python tools/blender_export_v5.py --             --old-manifest source/anatria-manifest.json             --out-dir public/anatomy-v5             --manifest public/anatomy-v5/manifest-v5.json | tee reports/export.log
+          ls -lh public/anatomy-v5
+
+      - name: Draco-compress v5 GLB assets
+        run: |
+          set -euo pipefail
+          for f in public/anatomy-v5/*_v5.glb; do
+            raw="${f%.glb}.raw.glb"
+            mv "$f" "$raw"
+            gltf-transform draco "$raw" "$f" --method edgebreaker
+            rm "$raw"
+          done
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path("public/anatomy-v5/manifest-v5.json")
+          m=json.loads(p.read_text())
+          names={
+              "skeletal":"skeletal_v5.glb",
+              "muscular":"muscular_v5.glb",
+              "attachments":"attachments_v5.glb",
+              "cardiovascular":"cardiovascular_v5.glb",
+          }
+          for key,row in m["stats"].items():
+              row["bytes"]=Path("public/anatomy-v5",names[key]).stat().st_size
+          p.write_text(json.dumps(m,ensure_ascii=False,indent=2))
+          PY
           ls -lh public/anatomy-v5
 
       - name: Compare QA metrics
@@ -114,6 +147,8 @@ jobs:
             echo "No generated asset changes."
           else
             git commit -m "Generate repaired v5 anatomy web assets"
+            git fetch origin v5-mesh-repair
+            git rebase origin/v5-mesh-repair
             git push origin HEAD:v5-mesh-repair
           fi
 
